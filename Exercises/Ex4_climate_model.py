@@ -47,7 +47,8 @@ def climate_column(Ts, Tcp, RH, N=100):
         return epsilon * es / (pPa - es)
 
     def specific_humidity_from_r(r):
-        # q = r / (1 + r)
+        # q = r / (1 + r) Wandelt den Massenmischungsanteil 𝑟 in die spezifische Feuchte 𝑞 um.
+        # q ist der Anteil der Wasserdampfmasse an der Gesamtmasse der feuchten Luft.
         return r / (1.0 + r)
 
     def moist_lapse_rate(TK, pPa):
