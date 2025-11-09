@@ -45,9 +45,9 @@ RH = 0.8     # relative Feuchte
 
 # --- Säulenprofil erzeugen ---
 p, T, x = climate_column(Ts=Ts, Tcp=Tcp, RH=RH, N=100)
-p_grid = p.astype(float)      # Pa, aufsteigend
-T_field = T.astype(float)     # K
-H2O_vmr = x.astype(float)     # VMR
+p_grid  = p.astype(float)      # Pa, fallend
+T_field = T.astype(float)      # K
+H2O_vmr = x.astype(float)      # VMR
 
 # --- Höhenfeld via Hypsometrie ---
 g = 9.80665
@@ -69,12 +69,11 @@ print("p_grid:", p_grid.shape)
 print("T_field:", T_field.shape)
 print("H2O_vmr:", H2O_vmr.shape)
 print("z_field:", z_field.shape)
-#-> shapes are correct error has to be with the content of the fields
+# -> shapes are correct, error has to be with the content of the fields
 
 print("p_grid decreasing:", np.all(np.diff(p_grid) < 0))
 print("z_field increasing:", np.all(np.diff(z_field) > 0))
 print("z_field min/max:", z_field.min(), z_field.max())
-
 
 # --- XML-Dateien schreiben ---
 write_vector_xml("p_grid.xml", p_grid)
@@ -125,6 +124,8 @@ ax.set_title("Clear sky outgoing radiance (climate_column atmosphere)")
 
 if "ARTS_HEADLESS" not in os.environ:
     plt.show()
+
+
 
 
 
