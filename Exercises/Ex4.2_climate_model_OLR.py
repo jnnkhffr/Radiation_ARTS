@@ -7,13 +7,14 @@ import numpy as np
 import os
 import matplotlib
 matplotlib.use("Agg")
+#import faulthandler
+#faulthandler.enable()
 import matplotlib.pyplot as plt
 import pyarts3 as pa
 
-# --- Dein Atmosphärenmodell ---
 from Ex4_climate_model import climate_column
 
-# --- Hilfsfunktionen zum Schreiben von ARTS-XML ---
+# Hilfsfunktionen zum Schreiben von ARTS-XML
 def write_vector_xml(filename, values):
     values = np.array(values, dtype=float)
     with open(filename, "w") as f:
@@ -89,7 +90,8 @@ kayser_grid = np.linspace(200, 1500, 100)  # cm^-1, reduzierter Bereich
 ws.frequency_grid = pa.arts.convert.kaycm2freq(kayser_grid)
 
 # Absorptionsspezies (erstmal nur H2O, stabiler)
-ws.absorption_speciesSet(species=["H2O"])
+#ws.absorption_speciesSet(species=["H2O-161, H2O-ForeignContCKDMT400, H2O-SelfContCKDMT400"])
+ws.absorption_speciesSet(species=["H2O-161"])
 
 # Katalogdaten laden
 ws.ReadCatalogData()
@@ -102,13 +104,27 @@ ws.surface_fieldPlanet(option="Earth")
 ws.surface_field[pa.arts.SurfaceKey("t")] = Ts
 
 # Atmosphärenfelder per XML einlesen
-ws.ReadXML("p_grid.xml")
-ws.ReadXML("t_field.xml")
-ws.ReadXML("vmr_field.xml")
-ws.ReadXML("z_field.xml")
+print("before read in xml files")
+print(os.path.abspath("z_field.xml"), os.path.exists("z_field.xml"))
+
+import xml.etree.ElementTree as ET
+try:
+    ET.parse("z_field.xml")
+    print("XML well-formed")
+except Exception as e:
+    print("XML parse error:", e)
+
+
+ws.ReadXML("p_grid.xml") #works
+print("p_grid finished")
+ws.ReadXML("t_field.xml") #works
+ws.ReadXML("vmr_field.xml") #works
+ws.ReadXML("z_field.xml") #works
+print("after read in xml files")
+print("ws.atmosphere_numberOfVmiFields:", ws.atmosphere_numberOfVmiFields)
 
 # Geometrie: Start knapp über Boden
-pos = [1.0, 0.0, 0.0]
+pos = [z_field[0] + 1.0, 0.0, 0.0]
 los = [180.0, 0.0]
 ws.ray_pathGeometric(pos=pos, los=los, max_step=1000.0)
 
