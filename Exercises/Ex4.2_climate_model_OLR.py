@@ -1,4 +1,5 @@
 """
+*** This skript is not working because it runs everytime into errors, due to the data structure.
 Clear-sky outgoing longwave radiation using ARTS,
 with custom single-column atmosphere from climate_column().
 """
