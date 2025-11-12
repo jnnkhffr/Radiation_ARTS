@@ -65,7 +65,7 @@ ws.absorption_speciesSet(species=[
     "H2O-161",
     "H2O-ForeignContCKDMT400",
     "H2O-SelfContCKDMT400",
-    # "CO2",
+    #"CO2-626",
     # "O3"
 ])
 
