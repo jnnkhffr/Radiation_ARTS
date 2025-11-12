@@ -90,17 +90,6 @@ spec_with_o3 = compute_radiance(atm_o3, include_o3=True)
 # Convert frequency to wavenumber for plotting
 kayser = pa.arts.convert.freq2kaycm(freq_grid)
 
-# Plot
-fig, ax = plt.subplots(figsize=(8,5))
-ax.plot(kayser, spec_no_o3, label="No O3", lw=2)
-ax.plot(kayser, spec_with_o3, label="With O3 (1e-6)", lw=2, linestyle="--")
-ax.set_xlabel("Wavenumber (cm$^{-1}$)")
-ax.set_ylabel("Spectral radiance")
-ax.set_title("Clear-sky outgoing radiance: effect of O3")
-ax.legend(); ax.grid(True)
-if "ARTS_HEADLESS" not in os.environ:
-    plt.show()
-
 # Integrate OLR
 def integrate_olr(freq, spec):
     rad = np.trapz(spec, x=freq)   # integrate over Hz
@@ -112,9 +101,37 @@ olr_with_o3 = integrate_olr(freq_grid, spec_with_o3)
 delta = olr_with_o3 - olr_no_o3
 pct = 100.0*delta/olr_no_o3
 
+# Ausgabe im Terminal
 print(f"OLR without O3: {olr_no_o3:.3f} W/m^2")
 print(f"OLR with O3 (1e-6): {olr_with_o3:.3f} W/m^2")
 print(f"Absolute change: {delta:.3f} W/m^2")
 print(f"Relative change: {pct:.3f} %")
 
+# Plot
+fig, ax = plt.subplots(figsize=(8,5))
+ax.plot(kayser, spec_no_o3, label="No O3", lw=2)
+ax.plot(kayser, spec_with_o3, label="With O3 (1e-6)", lw=2, linestyle="--")
+ax.set_xlabel("Wavenumber (cm$^{-1}$)")
+ax.set_ylabel("Spectral radiance")
+ax.set_title("Clear-sky outgoing radiance: effect of O3")
+ax.legend(); ax.grid(True)
 
+# Textbox mit den Ergebnissen ins Plot setzen
+textstr = (
+    f"OLR without O3: {olr_no_o3:.2f} W/m²\n"
+    f"OLR with O3 (1e-6): {olr_with_o3:.2f} W/m²\n"
+    f"ΔFlux: {delta:.2f} W/m²\n"
+    f"ΔFlux (%): {pct:.2f} %"
+)
+
+ax.text(
+    0.98, 0.95, textstr,
+    transform=ax.transAxes,
+    fontsize=10,
+    verticalalignment='top',
+    horizontalalignment='right',
+    bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.7)
+)
+
+if "ARTS_HEADLESS" not in os.environ:
+    plt.show()
