@@ -7,29 +7,29 @@ with custom single-column atmosphere from climate_column().
 
 import os
 import numpy as np
-#import matplotlib
-#matplotlib.use("Agg")
+# import matplotlib
+# matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pyarts3 as pa
 import xarray as xr
 
 from Ex4_climate_model import climate_column
 
-# --- Katalogdaten sicherstellen ---
+# Ensure catalog data is available
 pa.data.download()
 
-# --- Konstanten für dein Säulenmodell ---
-Ts = 290.0   # Oberflächentemperatur [K]
-Tcp = 200.0  # Tropopausentemperatur [K]
-RH = 0.8     # relative Feuchte
+# Constants for the column model
+Ts = 290.0   # surface temperature [K]
+Tcp = 200.0  # tropopause temperature [K]
+RH = 0.8     # relative humidity
 
-# --- Säulenprofil erzeugen ---
+# Generate column profile
 p, T, x = climate_column(Ts=Ts, Tcp=Tcp, RH=RH, N=100)
 p_grid  = p.astype(float)      # Pa
 T_field = T.astype(float)      # K
 H2O_vmr = x.astype(float)      # VMR
 
-# --- Höhenfeld via Hypsometrie ---
+# Height field via hypsometry
 g = 9.80665
 Rd = 287.05
 Rv = 461.5
@@ -53,32 +53,30 @@ print("p_grid decreasing:", np.all(np.diff(p_grid) < 0))
 print("z_field increasing:", np.all(np.diff(z_field) > 0))
 print("z_field min/max:", z_field.min(), z_field.max())
 
-# --- Workspace ---
+# Create workspace
 ws = pa.workspace.Workspace()
 
-# Frequenzgitter (Kayser -> Hz)
+# Frequency grid (Kayser -> Hz)
 kayser_grid = np.linspace(1, 2000, 100)  # cm^-1
 ws.frequency_grid = pa.arts.convert.kaycm2freq(kayser_grid)
 
-# Absorptionsspezies (empfohlen vollständige Nomenklatur)
+# Absorption species (recommended full nomenclature)
 ws.absorption_speciesSet(species=[
     "H2O-161",
     "H2O-ForeignContCKDMT400",
     "H2O-SelfContCKDMT400",
-    #"CO2",
-    #"O3"
+    # "CO2",
+    # "O3"
 ])
 
-# Katalogdaten laden
+# Load catalog data
 ws.ReadCatalogData()
 
-# --- Atmosphärenfelder direkt per xarray -> pa.data.to_atmospheric_field ---
-# Wir erstellen lat/lon als 1-element Arrays und formen die Feldvariablen auf (lat, lon, alt)
-
+# Create lat/lon as 1-element arrays and shape field variables to (lat, lon, alt)
 lat_vals = np.array([0.0])   # scalar latitude
 lon_vals = np.array([0.0])   # scalar longitude
 
-# sicherstellen: alt (z_field) ist aufsteigend; falls nicht, sortieren wir alle Arrays entsprechend
+# Ensure altitude (z_field) is ascending; if not, sort all arrays accordingly
 if not np.all(np.diff(z_field) > 0):
     order = np.argsort(z_field)
     z_field = z_field[order]
@@ -86,11 +84,11 @@ if not np.all(np.diff(z_field) > 0):
     T_field = T_field[order]
     H2O_vmr = H2O_vmr[order]
 
-# reshape zu (lat, lon, alt)
+# Reshape to (lat, lon, alt)
 t_3d   = T_field.reshape(1, 1, -1)
 p_3d   = p_grid.reshape(1, 1, -1)
 h2o_3d = H2O_vmr.reshape(1, 1, -1)
-alt_1d = z_field             # alt bleibt 1d
+alt_1d = z_field             # alt remains 1d
 
 atm = xr.Dataset(
     {
@@ -105,7 +103,7 @@ atm = xr.Dataset(
     }
 )
 
-# Attribute (wichtig für to_atmospheric_field)
+# Attributes (important for to_atmospheric_field)
 atm["t"].attrs = {"units": "K", "long_name": "Temperature"}
 atm["p"].attrs = {"units": "Pa", "long_name": "Pressure"}
 atm["H2O"].attrs = {"units": "mol/mol", "long_name": "Water vapor volume mixing ratio"}
@@ -113,11 +111,10 @@ atm["alt"].attrs = {"units": "m", "long_name": "Geometric altitude"}
 atm["lat"].attrs = {"units": "degrees_north"}
 atm["lon"].attrs = {"units": "degrees_east"}
 
-# Konvertieren und an workspace zuweisen
+# Convert and assign to workspace
 ws.atmospheric_field = pa.data.to_atmospheric_field(atm)
 
-
-# --- Quick checks (sicher, ohne nicht vorhandene Workspace-Attribute) ---
+# Quick checks (safe, without relying on potentially missing Workspace attributes)
 print("xarray atm summary:")
 print(atm)
 print("atm coords:", list(atm.coords))
@@ -125,31 +122,30 @@ print("atm dims and shapes:")
 for v in ["t", "p", "H2O"]:
     print(f"  {v}: dims={atm[v].dims}, shape={atm[v].shape}")
 
-# Zeige das in den Workspace übertragene Objekt an (repr oder dir sind robust)
+# Show the object transferred to the workspace (repr or dir are robust)
 print("ws.atmospheric_field (repr):", repr(ws.atmospheric_field))
 try:
     print("dir(ws.atmospheric_field):", sorted([k for k in dir(ws.atmospheric_field) if not k.startswith("_")])[:50])
 except Exception:
     pass
 
-# Wenn du weiterhin Informationen über das Druckgitter etc. brauchst, prüfe das xarray direkt:
+# If you still need pressure info, check the xarray directly
 print("pressure top/bottom:", float(atm["p"].isel(alt=0).values), float(atm["p"].isel(alt=-1).values))
 
-
-# Oberfläche
+# Surface
 ws.surface_fieldPlanet(option="Earth")
-# Oberfläche explizit aus Profil setzen (Index 0 = Boden)
+# Explicitly set the surface temperature from the profile (index 0 = surface)
 ws.surface_field[pa.arts.SurfaceKey("t")] = float(T_field[0])
 
-# Propagation agenda automatisch (falls nicht schon gesetzt)
+# Automatic propagation agenda (if not already set)
 ws.propagation_matrix_agendaAuto()
 
-# Geometrie: Start knapp über Boden
+# Geometry: start just above the surface
 pos = [float(z_field[0] + 1.0), 0.0, 0.0]
 los = [180.0, 0.0]
 ws.ray_pathGeometric(pos=pos, los=los, max_step=1000.0)
 
-# Strahlung berechnen
+# Compute radiance
 ws.spectral_radianceClearskyEmission()
 
 # Plot
@@ -162,5 +158,4 @@ ax.set_title("Clear sky outgoing radiance (climate_column atmosphere)")
 if "ARTS_HEADLESS" not in os.environ:
     plt.show()
 else:
-    #fig.savefig("olr_spectrum.png", dpi=200)
     None
