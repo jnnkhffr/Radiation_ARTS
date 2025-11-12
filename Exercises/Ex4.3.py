@@ -61,7 +61,7 @@ atm_o3 = atm_base.copy(deep=True)
 atm_o3["O3"] = (("lat","lon","alt"), np.ones_like(p_3d)*1e-6)
 atm_o3["O3"].attrs = {"units":"mol/mol"}
 
-# --- Function to compute clearsky radiance ---
+# Function to compute clearsky radiance
 def compute_radiance(atm, include_o3=False):
     ws = pa.workspace.Workspace()
     ws.frequency_grid = freq_grid.copy()
@@ -101,7 +101,7 @@ ax.legend(); ax.grid(True)
 if "ARTS_HEADLESS" not in os.environ:
     plt.show()
 
-# --- Integrate OLR ---
+# Integrate OLR
 def integrate_olr(freq, spec):
     rad = np.trapz(spec, x=freq)   # integrate over Hz
     flux = np.pi * rad             # multiply by pi for flux
