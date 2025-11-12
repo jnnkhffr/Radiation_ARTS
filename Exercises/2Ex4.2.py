@@ -57,20 +57,34 @@ print("z_field min/max:", z_field.min(), z_field.max())
 ws = pa.workspace.Workspace()
 
 # Frequency grid (Kayser -> Hz)
-kayser_grid = np.linspace(1, 2000, 100)  # cm^-1
+kayser_grid = np.linspace(1, 2000, 300)  # cm^-1
 ws.frequency_grid = pa.arts.convert.kaycm2freq(kayser_grid)
 
-# Absorption species (recommended full nomenclature)
+
+# Absorption species (realistic setup)
 ws.absorption_speciesSet(species=[
     "H2O-161",
     "H2O-ForeignContCKDMT400",
     "H2O-SelfContCKDMT400",
     #"CO2-626",
-    # "O3"
+    #"O3"
 ])
 
 # Load catalog data
 ws.ReadCatalogData()
+
+# Apply cutoff for CKD consistency
+cutoff = pa.arts.convert.kaycm2freq(25)
+for band in ws.absorption_bands:
+    ws.absorption_bands[band].cutoff = "ByLine"
+    ws.absorption_bands[band].cutoff_value = cutoff
+
+# Optional: remove weak lines to speed up
+ws.absorption_bands.keep_hitran_s(approximate_percentile=90)
+
+# Automatic propagation agenda
+ws.propagation_matrix_agendaAuto()
+
 
 # Create lat/lon as 1-element arrays and shape field variables to (lat, lon, alt)
 lat_vals = np.array([0.0])   # scalar latitude
@@ -141,7 +155,7 @@ ws.surface_field[pa.arts.SurfaceKey("t")] = float(T_field[0])
 ws.propagation_matrix_agendaAuto()
 
 # Geometry: start just above the surface
-pos = [float(z_field[0] + 1.0), 0.0, 0.0]
+pos = [100e3, 0.0, 0.0]
 los = [180.0, 0.0]
 ws.ray_pathGeometric(pos=pos, los=los, max_step=1000.0)
 
