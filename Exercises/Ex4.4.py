@@ -11,7 +11,7 @@ pa.data.download()
 ws = pa.workspace.Workspace()
 
 # Set up frequency grid
-kayser_grid = np.linspace(1, 2000, 1000)  # in Kayser (cm^-1)
+kayser_grid = np.linspace(1, 2000, 2000)  # in Kayser (cm^-1)
 ws.frequency_grid = pa.arts.convert.kaycm2freq(kayser_grid)  # in Hz
 
 # Select absorption species and continuum model
