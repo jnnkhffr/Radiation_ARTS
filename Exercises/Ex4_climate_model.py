@@ -29,7 +29,7 @@ def climate_column(Ts, Tcp, RH, N=100):
     Lv = 2.260e6               # latent heat of vaporization [J/kg] (2260 kJ/kg)
 
     # Pressure levels: logarithmically spaced from 1000 hPa to 1 hPa
-    p = np.logspace(np.log10(1000e2), np.log10(1e2), N)  # [Pa], from 1000 hPa to 1 hPa
+    p = np.logspace(np.log10(1000e2), np.log10(1e2), N)  # from 1000 hPa to 1 hPa
     ln_p = np.log(p)
 
     # Allocate arrays
@@ -47,7 +47,7 @@ def climate_column(Ts, Tcp, RH, N=100):
         return epsilon * es / (pPa - es)
 
     def specific_humidity_from_r(r):
-        # q = r / (1 + r) Wandelt den Massenmischungsanteil 𝑟 in die spezifische Feuchte 𝑞 um.
+        # q = r / (1 + r) Wandelt den Massenmischungsanteil r in die spezifische Feuchte q um.
         # q ist der Anteil der Wasserdampfmasse an der Gesamtmasse der feuchten Luft.
         return r / (1.0 + r)
 
@@ -62,7 +62,7 @@ def climate_column(Ts, Tcp, RH, N=100):
         # Tv = T * [1 + (Rv/Rd - 1) q]
         return TK * (1.0 + (Rv / Rd - 1.0) * q)
 
-    # Set surface temperature
+    # surface temperature
     T[0] = Ts
 
     # Upward integration along moist adiabat until T reaches Tcp
