@@ -66,8 +66,8 @@ ws.absorption_speciesSet(species=[
     "H2O-161",
     "H2O-ForeignContCKDMT400",
     "H2O-SelfContCKDMT400",
-    #"CO2-626",
-    #"O3"
+    "CO2-626",
+    "O3"
 ])
 
 # Load catalog data
@@ -109,6 +109,8 @@ atm = xr.Dataset(
         "t": (("lat", "lon", "alt"), t_3d),
         "p": (("lat", "lon", "alt"), p_3d),
         "H2O": (("lat", "lon", "alt"), h2o_3d),
+        "CO2": (("lat", "lon", "alt"), np.ones_like(p_3d) * 4e-4),   # 400 ppm
+        "O3":  (("lat", "lon", "alt"), np.ones_like(p_3d) * 1e-6),   # 1 ppm
     },
     coords={
         "lat": lat_vals,
@@ -116,6 +118,11 @@ atm = xr.Dataset(
         "alt": alt_1d
     }
 )
+
+# Attribute ergänzen
+atm["CO2"].attrs = {"units": "mol/mol", "long_name": "Carbon dioxide volume mixing ratio"}
+atm["O3"].attrs  = {"units": "mol/mol", "long_name": "Ozone volume mixing ratio"}
+
 
 # Attributes (important for to_atmospheric_field)
 atm["t"].attrs = {"units": "K", "long_name": "Temperature"}
