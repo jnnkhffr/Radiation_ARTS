@@ -136,14 +136,13 @@ def plot_profiles(p, T, x, Ts=None, Tcp=None, RH=None):
     axs[1].grid(True, ls='--', alpha=0.5)
     axs[1].set_ylim(1000, 1)
 
-    # Optional title with inputs
+    # Title
     if Ts is not None and Tcp is not None and RH is not None:
         fig.suptitle(f'Idealized single-column: Ts={Ts:.1f} K, Tcp={Tcp:.1f} K, RH={RH:.2f}', y=0.98)
 
     plt.tight_layout()
     plt.show()
 
-# --- Example usage ---
 if __name__ == "__main__":
     # Choose inputs
     Ts_example = 300.0   # K
