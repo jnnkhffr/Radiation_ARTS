@@ -1,3 +1,4 @@
+"""Muss noch überarbeitet werden VMR passt noch nicht ganz so. """
 import numpy as np
 import matplotlib.pyplot as plt
 
