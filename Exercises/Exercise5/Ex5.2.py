@@ -1,5 +1,5 @@
 """
-Spectral shortwave flux through the atmosphere (gefixt)
+Spectral shortwave flux through the atmosphere (Kaysers, Shortwave)
 """
 
 import matplotlib
@@ -21,41 +21,45 @@ fop = pyarts.recipe.SpectralAtmosphericFlux(
 atm = fop.get_atmosphere()
 
 # --- Kurzwelliger Bereich (Solarstrahlung) ---
-# Wir geben einen Bereich vor, aber ARTS reduziert intern das Gitter
+# Wellenzahlen 10.000–25.000 cm^-1 ~ sichtbares/UV
 kays = np.linspace(10000, 25000, 5000)
 freqs = pyarts.arts.convert.kaycm2freq(kays)
 
 # --- Simulation ---
 flux, alts = fop(freqs, atm)
 
-# --- Frequenzen aus der Rückgabe verwenden ---
-# Je nach Version heißt es flux.frequencies oder flux.freq
+# --- Frequenzen aus flux holen ---
 if hasattr(flux, "frequencies"):
     freqs_used = flux.frequencies
 elif hasattr(flux, "freq"):
     freqs_used = flux.freq
 else:
-    freqs_used = np.arange(flux.down.shape[1])  # fallback
+    raise RuntimeError("Keine Frequenzen im flux-Objekt gefunden")
+
+# Frequenzen zurück in Kaysers (cm^-1) umrechnen
+kays_used = pyarts.arts.convert.freq2kaycm(freqs_used)
 
 # --- Gesamtflüsse berechnen ---
-F_toa = np.trapz(flux.down[0, :], freqs_used)
-F_surface = np.trapz(flux.down[-1, :], freqs_used)
+F_toa = np.trapz(flux.down[0, :], kays_used)
+F_surface = np.trapz(flux.down[-1, :], kays_used)
 absorbed = F_toa - F_surface
 
 print(f"TOA shortwave flux: {F_toa:.2f} W/m^2")
 print(f"Surface shortwave flux: {F_surface:.2f} W/m^2")
 print(f"Absorbed in atmosphere: {absorbed:.2f} W/m^2")
 
-# --- Plot ---
+# --- Plot mit Kaysers auf der x-Achse ---
 plt.figure(figsize=(7,5))
-plt.plot(freqs_used, flux.down[0, :], label="TOA downwelling flux")
-plt.plot(freqs_used, flux.down[-1, :], label="Surface downwelling flux")
-plt.xlabel("Frequency [Hz]")  # oder Wavenumber, je nach freqs_used
-plt.ylabel("Spectral flux [W/m^2/Hz]")
+plt.plot(kays_used, flux.down[0, :], label="TOA downwelling flux")
+plt.plot(kays_used, flux.down[-1, :], label="Surface downwelling flux")
+plt.xlabel("Wavenumber [cm$^{-1}$]")   # jetzt korrekt in Kaysers
+plt.ylabel("Spectral flux [W/m$^2$/cm$^{-1}$]")
 plt.title("Spectral shortwave flux at TOA and surface")
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("C:/Users/janni/Desktop/shortwave_flux.png")
-  # Bild speichern statt Qt-Show
-#plt.show()
+#plt.savefig("shortwave_flux_kayser.png")
+
+plt.savefig("C:/Users/janni/Desktop/shortwave_flux_kayser.png")
+
+
