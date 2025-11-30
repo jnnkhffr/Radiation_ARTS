@@ -1,9 +1,9 @@
 """
-Spectral shortwave flux through the atmosphere (Kaysers, Shortwave)
+Spectral shortwave flux through the atmosphere (Kaysers, Shortwave, robust)
 """
 
 import matplotlib
-matplotlib.use("Agg")   # verhindert Qt-Fehler in PyCharm
+matplotlib.use("Agg")  # headless Plot, vermeidet Qt-Probleme
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,49 +16,53 @@ pyarts.data.download()
 fop = pyarts.recipe.SpectralAtmosphericFlux(
     species=["H2O-161", "O2-66", "N2-44", "CO2-626", "O3-XFIT"],
     remove_lines_percentile={"H2O": 70},
+    atmospheric_altitude=50e3,      # TOA bei 50 km
+    visible_surface_reflectivity=0.3,
 )
 
+# --- Atmosphäre holen (optional anpassbar) ---
 atm = fop.get_atmosphere()
 
-# --- Kurzwelliger Bereich (Solarstrahlung) ---
-# Wellenzahlen 10.000–25.000 cm^-1 ~ sichtbares/UV
-kays = np.linspace(10000, 25000, 5000)
-freqs = pyarts.arts.convert.kaycm2freq(kays)
+# --- Kurzwelliger Bereich (Solar): 10k–25k cm^-1 ---
+kays_in = np.linspace(10000, 25000, 5000)                          # Kaysers (cm^-1)
+freqs_in = pyarts.arts.convert.kaycm2freq(kays_in)                  # Hz
 
 # --- Simulation ---
-flux, alts = fop(freqs, atm)
+flux, alts = fop(freqs_in, atm)
+# flux.up, flux.diffuse_down, flux.direct_down haben Form: [n_freq, n_alt]
+# flux.down = diffuse + direct
 
-# --- Frequenzen aus flux holen ---
-if hasattr(flux, "frequencies"):
-    freqs_used = flux.frequencies
-elif hasattr(flux, "freq"):
-    freqs_used = flux.freq
-else:
-    raise RuntimeError("Keine Frequenzen im flux-Objekt gefunden")
+# --- Achsenrobustheit: benutze genau so viele Frequenzpunkte wie flux berechnet hat ---
+nfreq = flux.down.shape[0]
+freqs_used = freqs_in[:nfreq]                                       # Hz, Länge passt zu flux
+kays_used = pyarts.arts.convert.freq2kaycm(freqs_used)              # zurück in cm^-1
 
-# Frequenzen zurück in Kaysers (cm^-1) umrechnen
-kays_used = pyarts.arts.convert.freq2kaycm(freqs_used)
+# --- TOA und Oberfläche robust bestimmen über Höhe ---
+# alts ist mittlere Layerhöhe; wir nehmen Index des Minimums als Oberfläche, Maximum als TOA
+i_sfc = int(np.argmin(alts))
+i_toa = int(np.argmax(alts))
 
-# --- Gesamtflüsse berechnen ---
-F_toa = np.trapz(flux.down[0, :], kays_used)
-F_surface = np.trapz(flux.down[-1, :], kays_used)
-absorbed = F_toa - F_surface
+# --- Gesamtflüsse (über Kaysers integrieren) ---
+# Spektrale Flüsse sind entlang der Frequenzachse (0) verteilt, Integration über kays_used
+F_toa_down = np.trapz(flux.down[:, i_toa], kays_used)               # W/m^2
+F_sfc_down = np.trapz(flux.down[:, i_sfc], kays_used)               # W/m^2
+absorbed_sw = F_toa_down - F_sfc_down
 
-print(f"TOA shortwave flux: {F_toa:.2f} W/m^2")
-print(f"Surface shortwave flux: {F_surface:.2f} W/m^2")
-print(f"Absorbed in atmosphere: {absorbed:.2f} W/m^2")
+print(f"TOA shortwave downwelling flux: {F_toa_down:.2f} W/m^2")
+print(f"Surface shortwave downwelling flux: {F_sfc_down:.2f} W/m^2")
+print(f"Absorbed in atmosphere (shortwave): {absorbed_sw:.2f} W/m^2")
 
-# --- Plot mit Kaysers auf der x-Achse ---
-plt.figure(figsize=(7,5))
-plt.plot(kays_used, flux.down[0, :], label="TOA downwelling flux")
-plt.plot(kays_used, flux.down[-1, :], label="Surface downwelling flux")
-plt.xlabel("Wavenumber [cm$^{-1}$]")   # jetzt korrekt in Kaysers
-plt.ylabel("Spectral flux [W/m$^2$/cm$^{-1}$]")
+# --- Plot: Spektralflüsse am TOA und an der Oberfläche (x-Achse in Kaysers) ---
+plt.figure(figsize=(8,5))
+plt.plot(kays_used, flux.down[:, i_toa], label="TOA downwelling flux")
+plt.plot(kays_used, flux.down[:, i_sfc], label="Surface downwelling flux")
+plt.xlabel("Wavenumber [cm$^{-1}$]")               # Kaysers
+plt.ylabel("Spectral flux [W/m$^2$/cm$^{-1}$]")    # pro Kaysers
 plt.title("Spectral shortwave flux at TOA and surface")
 plt.legend()
-plt.grid(True)
+plt.grid(True, alpha=0.3)
 plt.tight_layout()
-#plt.savefig("shortwave_flux_kayser.png")
+#plt.savefig("shortwave_flux_kayser.png")           # im aktuellen Arbeitsverzeichnis speichern
 
 plt.savefig("C:/Users/janni/Desktop/shortwave_flux_kayser.png")
 
