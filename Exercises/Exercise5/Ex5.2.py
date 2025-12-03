@@ -64,6 +64,6 @@ plt.grid(True, alpha=0.3)
 plt.tight_layout()
 #plt.savefig("shortwave_flux_kayser.png")           # im aktuellen Arbeitsverzeichnis speichern
 
-plt.savefig("C:/Users/janni/Desktop/shortwave_flux_kayser.png")
+plt.savefig("C:/Users/janni/Desktop/v3shortwave_flux_kayser.png")
 
 
