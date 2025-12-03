@@ -13,12 +13,20 @@ import pyarts3 as pyarts
 pyarts.data.download()
 
 # --- Operator initialisieren ---
+#fop = pyarts.recipe.SpectralAtmosphericFlux(
+#    species=["H2O-161", "O2-66", "N2-44", "CO2-626", "O3-XFIT"],
+#    remove_lines_percentile={"H2O": 70},
+#    atmospheric_altitude=50e3,      # TOA bei 50 km
+#    visible_surface_reflectivity=0.3,
+#)
 fop = pyarts.recipe.SpectralAtmosphericFlux(
     species=["H2O-161", "O2-66", "N2-44", "CO2-626", "O3-XFIT"],
     remove_lines_percentile={"H2O": 70},
-    atmospheric_altitude=50e3,      # TOA bei 50 km
-    visible_surface_reflectivity=0.3,
+    atmospheric_altitude=50e3,
+    visible_surface_reflectivity= 1 #0.3,
+    #solar_source="kurucz"   # oder "sun" je nach pyarts-Version
 )
+
 
 # --- Atmosphäre holen (optional anpassbar) ---
 atm = fop.get_atmosphere()
@@ -26,6 +34,10 @@ atm = fop.get_atmosphere()
 # --- Kurzwelliger Bereich (Solar): 10k–25k cm^-1 ---
 kays_in = np.linspace(10000, 25000, 5000)                          # Kaysers (cm^-1)
 freqs_in = pyarts.arts.convert.kaycm2freq(kays_in)                  # Hz
+# --- Kurzwelliger Bereich (Solar): sinnvoller Bereich für ARTS-Sonne ---
+#kays_in = np.linspace(400, 2500, 5000)                 # cm^-1
+#freqs_in = pyarts.arts.convert.kaycm2freq(kays_in)     # Hz
+
 
 # --- Simulation ---
 flux, alts = fop(freqs_in, atm)
@@ -44,9 +56,14 @@ i_toa = int(np.argmax(alts))
 
 # --- Gesamtflüsse (über Kaysers integrieren) ---
 # Spektrale Flüsse sind entlang der Frequenzachse (0) verteilt, Integration über kays_used
-F_toa_down = np.trapz(flux.down[:, i_toa], kays_used)               # W/m^2
-F_sfc_down = np.trapz(flux.down[:, i_sfc], kays_used)               # W/m^2
+#F_toa_down = np.trapz(flux.down[:, i_toa], kays_used)               # W/m^2
+#F_sfc_down = np.trapz(flux.down[:, i_sfc], kays_used)               # W/m^2
+#absorbed_sw = F_toa_down - F_sfc_down
+# --- Gesamtflüsse (über Frequenz integrieren) ---
+F_toa_down = np.trapz(flux.down[:, i_toa], freqs_used)              # W/m^2
+F_sfc_down = np.trapz(flux.down[:, i_sfc], freqs_used)              # W/m^2
 absorbed_sw = F_toa_down - F_sfc_down
+
 
 print(f"TOA shortwave downwelling flux: {F_toa_down:.2f} W/m^2")
 print(f"Surface shortwave downwelling flux: {F_sfc_down:.2f} W/m^2")
@@ -64,6 +81,6 @@ plt.grid(True, alpha=0.3)
 plt.tight_layout()
 #plt.savefig("shortwave_flux_kayser.png")           # im aktuellen Arbeitsverzeichnis speichern
 
-plt.savefig("C:/Users/janni/Desktop/v3shortwave_flux_kayser.png")
+plt.savefig("C:/Users/janni/Desktop/v2shortwave_flux_kayser.png")
 
 
