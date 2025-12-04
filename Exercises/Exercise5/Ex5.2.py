@@ -69,9 +69,9 @@ F_sfc_down = np.trapz(flux.down[:, i_sfc], freqs_used)              # W/m^2
 absorbed_sw = F_toa_down - F_sfc_down
 
 
-print(f"TOA shortwave downwelling flux: {F_toa_down:.2f} W/m^2")
-print(f"Surface shortwave downwelling flux: {F_sfc_down:.2f} W/m^2")
-print(f"Absorbed in atmosphere (shortwave): {absorbed_sw:.2f} W/m^2")
+print(f"TOA shortwave downwelling flux: {F_toa_down:} W/m^2") #{F_toa_down:.2f} W/m^2")
+print(f"Surface shortwave downwelling flux: {F_sfc_down:} W/m^2")
+print(f"Absorbed in atmosphere (shortwave): {absorbed_sw:} W/m^2")
 
 # --- Plot: Spektralflüsse am TOA und an der Oberfläche (x-Achse in Kaysers) ---
 plt.figure(figsize=(8,5))
