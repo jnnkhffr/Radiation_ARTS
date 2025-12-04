@@ -54,6 +54,10 @@ kays_used = pyarts.arts.convert.freq2kaycm(freqs_used)              # zurück in
 i_sfc = int(np.argmin(alts))
 i_toa = int(np.argmax(alts))
 
+# Für die Flussberechnung
+# (down - up) from TOA - (down -up) from surface
+
+
 # --- Gesamtflüsse (über Kaysers integrieren) ---
 # Spektrale Flüsse sind entlang der Frequenzachse (0) verteilt, Integration über kays_used
 #F_toa_down = np.trapz(flux.down[:, i_toa], kays_used)               # W/m^2
