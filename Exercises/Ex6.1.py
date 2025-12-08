@@ -1,82 +1,169 @@
 # Ex6.1.py — Aufgabe 1: OLR-Spektrum für 1×CO2 und 2×CO2
 
-import matplotlib
-matplotlib.use("Agg")   # verhindert Qt-Fehler in PyCharm
-
+import os
 import numpy as np
 import matplotlib.pyplot as plt
+import pyarts3 as pa
+import xarray as xr
 
-# Klimamodell importieren (NICHT im Skript einbauen!)
-from Ex4_climate_model import climate_column
+from Ex4_climate_model import climate_column   # dein Modell
 
-
-# ---------------------------------------------------------
-#  compute_OLR_spectrum() — vereinfachtes Spektralmodell
-# ---------------------------------------------------------
-
-def planck(nu, T):
-    h = 6.626e-34
-    c = 3e8
-    k = 1.381e-23
-    nu_SI = nu * 100 * c
-    return (2*h*nu_SI**3 / c**2) / (np.exp(h*nu_SI/(k*T)) - 1)
-
-def compute_OLR_spectrum(p, T, x, co2_factor=1.0):
-
-    # Spektralbereich
-    nu = np.linspace(400, 2000, 800)
-
-    # CO2 15 µm Band
-    co2_center = 667
-    co2_width = 180
-    k_co2 = 1e-20 * np.exp(-((nu - co2_center)**2) / (2 * co2_width**2))
-
-    # H2O breitband
-    k_h2o = 5e-22 * (1 + 0.5*np.exp(-(nu-1500)**2/200**2))
-
-    dp = np.abs(np.gradient(p))
-    tau = np.zeros((len(nu), len(p)))
-
-    for i in range(len(p)):
-        tau[:, i] = (k_co2 * co2_factor + k_h2o * x[i]) * dp[i]
-
-    tau_cum = np.cumsum(tau[:, ::-1], axis=1)[:, ::-1]
-
-    OLR = np.zeros(len(nu))
-    for j in range(len(nu)):
-        idx = np.argmin(np.abs(tau_cum[j] - 1))
-        OLR[j] = np.pi * planck(nu[j], T[idx])
-
-    return nu, OLR
+import pyarts3 as pa
+pa.data.download()
 
 
-# ---------------------------------------------------------
-#  Aufgabe 6.1: OLR für 1× und 2× CO2
-# ---------------------------------------------------------
+# ============================================================
+# 1. Atmosphärenprofil erzeugen
+# ============================================================
 
-Ts = 300
-Tcp = 200
+Ts = 290.0
+Tcp = 200.0
 RH = 0.8
 
-# Klimamodell aufrufen
-p, T, x = climate_column(Ts, Tcp, RH)
+p, T, x = climate_column(Ts=Ts, Tcp=Tcp, RH=RH, N=100)
+p_grid  = p.astype(float)
+T_field = T.astype(float)
+H2O_vmr = x.astype(float)
 
-# OLR berechnen
-nu, OLR_1x = compute_OLR_spectrum(p, T, x, co2_factor=1.0)
-_,  OLR_2x = compute_OLR_spectrum(p, T, x, co2_factor=2.0)
+# ============================================================
+# 2. Höhe aus Hypsometrie berechnen
+# ============================================================
 
-# Plotten
+g = 9.80665
+Rd = 287.05
+Rv = 461.5
+epsilon = Rd / Rv
+
+e = H2O_vmr * p_grid
+r = epsilon * e / (p_grid - e)
+q = r / (1.0 + r)
+Tv = T_field * (1.0 + (Rv / Rd - 1.0) * q)
+
+z_field = np.zeros_like(p_grid)
+for i in range(len(p_grid) - 1):
+    Tv_bar = 0.5 * (Tv[i] + Tv[i+1])
+    z_field[i+1] = z_field[i] + (Rd / g) * Tv_bar * np.log(p_grid[i] / p_grid[i+1])
+
+# ============================================================
+# 3. ARTS Workspace vorbereiten
+# ============================================================
+
+ws = pa.workspace.Workspace()
+
+# Frequenzgitter (Kayser → Hz)
+kayser_grid = np.linspace(1, 2000, 300)
+ws.frequency_grid = pa.arts.convert.kaycm2freq(kayser_grid)
+
+# Absorptionsspezies
+ws.absorption_speciesSet(species=[
+    "H2O-161",
+    "H2O-ForeignContCKDMT400",
+    "H2O-SelfContCKDMT400",
+    "CO2-626",
+    "O3"
+])
+
+ws.ReadCatalogData()
+
+cutoff = pa.arts.convert.kaycm2freq(25)
+for band in ws.absorption_bands:
+    ws.absorption_bands[band].cutoff = "ByLine"
+    ws.absorption_bands[band].cutoff_value = cutoff
+
+ws.absorption_bands.keep_hitran_s(approximate_percentile=90)
+ws.propagation_matrix_agendaAuto()
+
+# ============================================================
+# 4. Atmosphären-Dataset für ARTS bauen
+# ============================================================
+
+atm = xr.Dataset(
+    {
+        "t":   (("lat","lon","alt"), T_field.reshape(1,1,-1)),
+        "p":   (("lat","lon","alt"), p_grid.reshape(1,1,-1)),
+        "H2O": (("lat","lon","alt"), H2O_vmr.reshape(1,1,-1)),
+        "CO2": (("lat","lon","alt"), np.ones((1,1,len(p_grid))) * 4e-4),  # 400 ppm
+        "O3":  (("lat","lon","alt"), np.ones((1,1,len(p_grid))) * 1e-6),
+    },
+    coords={
+        "lat": [0.0],
+        "lon": [0.0],
+        "alt": z_field
+    }
+)
+
+ws.atmospheric_field = pa.data.to_atmospheric_field(atm)
+
+# Oberfläche setzen
+ws.surface_fieldPlanet(option="Earth")
+ws.surface_field[pa.arts.SurfaceKey("t")] = float(T_field[0])
+
+# Strahlungsgeometrie
+pos = [100e3, 0.0, 0.0]
+los = [180.0, 0.0]
+ws.ray_pathGeometric(pos=pos, los=los, max_step=1000.0)
+
+# ============================================================
+# 5. Funktionen für OLR-Berechnung
+# ============================================================
+
+def compute_OLR_spectrum_ARTS(atm_dataset, CO2_vmr):
+    # Kopie des Atmosphärenprofils
+    atm_mod = atm_dataset.copy()
+    atm_mod["CO2"][:] = CO2_vmr
+
+    # Atmosphärenfeld neu setzen
+    ws.atmospheric_field = pa.data.to_atmospheric_field(atm_mod)
+
+    # WICHTIG: Agenda neu setzen → zwingt ARTS zur Neuberechnung der Absorption
+    ws.propagation_matrix_agendaAuto()
+
+    # Strahlungspfad neu berechnen
+    pos = [100e3, 0.0, 0.0]
+    los = [180.0, 0.0]
+    ws.ray_pathGeometric(pos=pos, los=los, max_step=1000.0)
+
+    # Radiance berechnen
+    ws.spectral_radianceClearskyEmission()
+
+    return ws.spectral_radiance[:, 0]
+
+
+
+
+
+
+
+def integrate_OLR(kayser_grid, spectrum):
+    return np.trapezoid(spectrum, kayser_grid)
+
+# ============================================================
+# 6. Aufgabe 1: CO₂ verdoppeln & Spektren vergleichen
+# ============================================================
+
+CO2_1x = 4e-4
+CO2_2x = 8e-4
+
+OLR_1x = compute_OLR_spectrum_ARTS(atm, CO2_1x)
+OLR_2x = compute_OLR_spectrum_ARTS(atm, CO2_2x)
+print("Difference max:", np.max(np.abs(OLR_2x - OLR_1x)))
+
+# Plot Spektren
 plt.figure(figsize=(10,5))
-plt.plot(nu, OLR_1x, label="1× CO₂")
-plt.plot(nu, OLR_2x, label="2× CO₂")
+plt.plot(kayser_grid, OLR_1x, label="1× CO₂ (400 ppm)")
+plt.plot(kayser_grid, OLR_2x, label="2× CO₂ (800 ppm)")
 plt.xlabel("Wavenumber [cm⁻¹]")
-plt.ylabel("OLR [W/m²/cm⁻¹]")
-plt.title("OLR Spectrum for 1× and 2× CO₂")
-plt.grid()
+plt.ylabel("Spectral radiance")
+plt.title("OLR spectrum for 1× and 2× CO₂")
 plt.legend()
-#plt.savefig("OLR_spectrum_CO2_doubling.png")
-plt.show
+plt.grid(True)
+plt.show()
 
-# Radiative Forcing
-F_inst = np.trapezoid(OLR_1x - OLR_2x, nu)
-print("Instantaneous Radiative Forcing =", F_inst, "W/m²")
+# Plot Differenz
+plt.figure(figsize=(10,5))
+plt.plot(kayser_grid, OLR_2x - OLR_1x)
+plt.xlabel("Wavenumber [cm⁻¹]")
+plt.ylabel("ΔOLR (2× - 1×)")
+plt.title("Spectral OLR difference (CO₂ doubling)")
+plt.grid(True)
+plt.show()
