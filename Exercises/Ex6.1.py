@@ -108,30 +108,43 @@ ws.ray_pathGeometric(pos=pos, los=los, max_step=1000.0)
 # ============================================================
 
 def compute_OLR_spectrum_ARTS(atm_dataset, CO2_vmr):
-    # Kopie des Atmosphärenprofils
+
+    ws = pa.workspace.Workspace()
+
+    ws.frequency_grid = pa.arts.convert.kaycm2freq(kayser_grid)
+
+    ws.absorption_speciesSet(species=[
+        "H2O-161",
+        "H2O-ForeignContCKDMT400",
+        "H2O-SelfContCKDMT400",
+        "CO2-626",
+        "O3"
+    ])
+    ws.ReadCatalogData()
+    ws.propagation_matrix_agendaAuto()
+
     atm_mod = atm_dataset.copy()
     atm_mod["CO2"][:] = CO2_vmr
 
-    # Atmosphärenfeld neu setzen
     ws.atmospheric_field = pa.data.to_atmospheric_field(atm_mod)
 
-    # WICHTIG: Agenda neu setzen → zwingt ARTS zur Neuberechnung der Absorption
-    ws.propagation_matrix_agendaAuto()
+    ws.surface_fieldPlanet(option="Earth")
+    ws.surface_field[pa.arts.SurfaceKey("t")] = float(atm_mod["t"].values[0,0,0])
 
-    # Strahlungspfad neu berechnen
+    # Beobachter knapp über TOA
+    z_top = float(atm_mod["alt"].values[-1])
     pos = [100e3, 0.0, 0.0]
     los = [180.0, 0.0]
-    ws.ray_pathGeometric(pos=pos, los=los, max_step=1000.0)
 
-    # Radiance berechnen
+    ws.ray_pathGeometric(pos=pos, los=los, max_step=2000.0)
+
     ws.spectral_radianceClearskyEmission()
 
-    return ws.spectral_radiance[:, 0]
+    rad = np.array(ws.spectral_radiance.value)
+    while rad.ndim > 1:
+        rad = rad[:, 0]
 
-
-
-
-
+    return rad
 
 
 def integrate_OLR(kayser_grid, spectrum):
@@ -141,17 +154,12 @@ def integrate_OLR(kayser_grid, spectrum):
 # 6. Aufgabe 1: CO₂ verdoppeln & Spektren vergleichen
 # ============================================================
 
-CO2_1x = 4e-4
-CO2_2x = 8e-4
+OLR_1x = compute_OLR_spectrum_ARTS(atm, 4e-4)
+OLR_2x = compute_OLR_spectrum_ARTS(atm, 8e-4)
 
-OLR_1x = compute_OLR_spectrum_ARTS(atm, CO2_1x)
-OLR_2x = compute_OLR_spectrum_ARTS(atm, CO2_2x)
-print("Difference max:", np.max(np.abs(OLR_2x - OLR_1x)))
-
-# Plot Spektren
 plt.figure(figsize=(10,5))
-plt.plot(kayser_grid, OLR_1x, label="1× CO₂ (400 ppm)")
-plt.plot(kayser_grid, OLR_2x, label="2× CO₂ (800 ppm)")
+plt.plot(kayser_grid, OLR_1x, label="400 ppm CO₂")
+plt.plot(kayser_grid, OLR_2x, label="800 ppm CO₂")
 plt.xlabel("Wavenumber [cm⁻¹]")
 plt.ylabel("Spectral radiance")
 plt.title("OLR spectrum for 1× and 2× CO₂")
@@ -159,11 +167,36 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-# Plot Differenz
 plt.figure(figsize=(10,5))
 plt.plot(kayser_grid, OLR_2x - OLR_1x)
 plt.xlabel("Wavenumber [cm⁻¹]")
 plt.ylabel("ΔOLR (2× - 1×)")
 plt.title("Spectral OLR difference (CO₂ doubling)")
+plt.grid(True)
+plt.show()
+
+
+
+
+#Nr.6.2
+CO2_factors = [0.25, 0.5, 1, 2, 4, 8]
+CO2_base = 4e-4
+
+OLR_values = []
+for f in CO2_factors:
+    CO2_vmr = CO2_base * f
+    spectrum = compute_OLR_spectrum_ARTS(atm, CO2_vmr)
+    OLR = integrate_OLR(kayser_grid, spectrum)
+    OLR_values.append(OLR)
+
+OLR_1x = OLR_values[CO2_factors.index(1)]
+forcing = [OLR_1x - val for val in OLR_values]
+
+plt.figure(figsize=(8,5))
+plt.plot(CO2_factors, forcing, marker="o")
+plt.xscale("log", base=2)
+plt.xlabel("CO₂ factor (relative to 1×)")
+plt.ylabel("Radiative forcing [W/m²]")
+plt.title("Radiative forcing for multiple CO₂ doublings")
 plt.grid(True)
 plt.show()
