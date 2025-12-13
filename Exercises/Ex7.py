@@ -90,9 +90,7 @@ def integrate_OLR(kayser_grid, spectrum):
     return np.trapezoid(spectrum, kayser_grid)
 
 
-# ------------------------------------------------------------
 # Exercise 7
-# ------------------------------------------------------------
 
 kayser_grid = np.linspace(1, 2000, 300)
 
@@ -104,32 +102,25 @@ def run_exercise7(Ts_baseline):
     atm_base, p, T_base, x_base = build_atmosphere(Ts=Ts_baseline, Tcp=200, RH=0.8)
     OLR_base = compute_OLR_spectrum_ARTS(atm_base)
 
-    # --------------------------------------------------------
     # Case 1: Ts + 1 K, aber T-Profil & H2O unverändert
-    # --------------------------------------------------------
     T1 = T_base.copy()
     T1[0] += 1.0  # nur Oberfläche wärmer
     atm1 = atm_base.copy()
     atm1["t"][:] = T1.reshape(1,1,-1)
     OLR1 = compute_OLR_spectrum_ARTS(atm1)
 
-    # --------------------------------------------------------
     # Case 2: Ts + 1 K, gesamtes T-Profil +1 K, H2O unverändert
-    # --------------------------------------------------------
     T2 = T_base + 1.0
     atm2 = atm_base.copy()
     atm2["t"][:] = T2.reshape(1,1,-1)
     OLR2 = compute_OLR_spectrum_ARTS(atm2)
 
-    # --------------------------------------------------------
+
     # Case 3: Ts + 1 K, T-Profil +1 K, H2O neu berechnet (RH konstant)
-    # --------------------------------------------------------
     atm3, _, _, _ = build_atmosphere(Ts=Ts_baseline+1, Tcp=200, RH=0.8)
     OLR3 = compute_OLR_spectrum_ARTS(atm3)
 
-    # --------------------------------------------------------
     # Plotting
-    # --------------------------------------------------------
     plt.figure(figsize=(10,6))
     plt.plot(kayser_grid, OLR1 - OLR_base, label="Case 1: only Ts +1K")
     plt.plot(kayser_grid, OLR2 - OLR_base, label="Case 2: T-profile +1K")
@@ -142,23 +133,19 @@ def run_exercise7(Ts_baseline):
     plt.grid(True)
     plt.show()
 
-    # --------------------------------------------------------
     # Integrals
-    # --------------------------------------------------------
     d1 = integrate_OLR(kayser_grid, OLR1 - OLR_base)
     d2 = integrate_OLR(kayser_grid, OLR2 - OLR_base)
     d3 = integrate_OLR(kayser_grid, OLR3 - OLR_base)
 
-    print(f"Integrated ΔOLR (Case 1): {d1:.3f} W/m²")
-    print(f"Integrated ΔOLR (Case 2): {d2:.3f} W/m²")
-    print(f"Integrated ΔOLR (Case 3): {d3:.3f} W/m²")
+    print(f"Integrated ΔOLR (Case 1): {d1} W/m²")
+    print(f"Integrated ΔOLR (Case 2): {d2} W/m²")
+    print(f"Integrated ΔOLR (Case 3): {d3} W/m²")
 
     return d1, d2, d3
 
 
-# ------------------------------------------------------------
 # Run Exercise 7 for Ts = 290 K and Ts = 300 K
-# ------------------------------------------------------------
 
 results_290 = run_exercise7(290)
 results_300 = run_exercise7(300)
